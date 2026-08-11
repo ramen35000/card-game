@@ -222,6 +222,27 @@
             logBox.scrollTop = logBox.scrollHeight;
         }
 
+        function updateLobbyUI() {
+            if(!document.getElementById('lobby-screen')) return;
+            document.getElementById('display-room-code').innerText = gameState.roomCode;
+            const listEl = document.getElementById('player-list');
+            if(gameState.players && gameState.players.length > 0) {
+                listEl.innerHTML = 'Players:<br>' + gameState.players.map(p => {
+                    const hostLabel = (p.id === gameState.players[0].id) ? ' (Host)' : '';
+                    // If this client is the host, mark their name accordingly
+                    const youLabel = (p.id === gameState.myId) ? ' (You)' : '';
+                    return `- ${p.name}${hostLabel}${youLabel}`;
+                }).join('<br>');
+            } else {
+                listEl.innerText = 'No players yet.';
+            }
+
+            // Show start button only if this client is the host
+            const startBtn = document.getElementById('start-btn');
+            if(gameState.isHost) startBtn.style.display = 'inline-block';
+            else startBtn.style.display = 'none';
+        }
+
         function hostGame() {
             const name = document.getElementById('player-name').value.trim();
             if(!name) { alert('Please enter your name'); return; }
@@ -230,11 +251,12 @@
             gameState.roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
             
             gameState.players = [{ id: gameState.myId, name: name, grid: [], score: 0 }];
-            
-            document.getElementById('display-room-code').innerText = gameState.roomCode;
-            document.getElementById('player-list').innerText = `Players: ${name} (Host)`;
-            document.getElementById('start-btn').style.display = 'inline-block';
-            
+
+            // Persist the room so joiners can find it
+            const roomData = { players: gameState.players, phase: 'waiting' };
+            localStorage.setItem('cambio_' + gameState.roomCode, JSON.stringify(roomData));
+
+            updateLobbyUI();
             showScreen('lobby-screen');
             startPolling();
         }
@@ -251,13 +273,21 @@
             // Simulating joining via local storage sync
             let roomData = JSON.parse(localStorage.getItem('cambio_' + code));
             if(!roomData) {
-                // For standalone testing if second tab joins simulation
-                roomData = { players: [{id: 'host', name: 'Host'}], phase: 'waiting' };
+                alert('Room not found. Make sure the host has created the room and shared the correct code.');
+                return;
             }
-            roomData.players.push({ id: gameState.myId, name: name, grid: [], score: 0 });
+
+            // Avoid duplicate joins
+            roomData.players = roomData.players || [];
+            if(!roomData.players.find(p => p.id === gameState.myId)) {
+                roomData.players.push({ id: gameState.myId, name: name, grid: [], score: 0 });
+            }
             localStorage.setItem('cambio_' + code, JSON.stringify(roomData));
 
-            document.getElementById('display-room-code').innerText = code;
+            // Update local copy from the shared room data
+            gameState.players = roomData.players;
+
+            updateLobbyUI();
             showScreen('lobby-screen');
             startPolling();
         }
@@ -267,7 +297,14 @@
                 if(gameState.roomCode) {
                     let data = JSON.parse(localStorage.getItem('cambio_' + gameState.roomCode));
                     if(data) {
+                        // Keep the local players in sync with stored room
                         gameState.players = data.players || gameState.players;
+
+                        // Update lobby UI so host sees new joiners
+                        if(document.getElementById('lobby-screen').classList.contains('active')) {
+                            updateLobbyUI();
+                        }
+
                         if(data.phase === 'playing' && document.getElementById('lobby-screen').classList.contains('active')) {
                             initGameClient(data);
                         }
