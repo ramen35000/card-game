@@ -178,7 +178,10 @@
         let gameState = {
             roomCode: '',
             isHost: false,
-            myId: Math.random().toString(36.substring(2, 7)),
+
+            // Fix parens
+            myId: Math.random().toString(36).substring(2, 7),
+            
             myName: '',
             players: [],
             turnIndex: 0,
