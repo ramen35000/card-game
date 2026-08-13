@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom Cambio Online</title>
+    <title>Cambio Remake</title>
     <style>
         :root {
             --bg-color: #071b4d;
@@ -37,6 +37,8 @@
             min-height: 100vh;
         }
         h1, h2, h3 { margin: 5px 0 15px 0; }
+        /* ensure the home screen title sits below the rim */
+        #home-screen h1 { margin-top: 48px; }
         .card {
             width: 70px;
             height: 100px;
@@ -150,7 +152,7 @@
 
     <!-- HOME SCREEN -->
     <div id="home-screen" class="screen active">
-        <h1>Cambio (Custom Rules)</h1>
+        <h1>Cambio Remake</h1>
         <p>Aces=0, Red Kings=1, Black Kings=13, Queens=12, Jacks=11</p>
         <div style="margin-top: 30px;">
             <input type="text" id="player-name" placeholder="Enter Your Name" maxlength="10"><br>
