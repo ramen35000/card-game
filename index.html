@@ -9,8 +9,8 @@
             --bg-color: #071b4d;
             --card-bg: #b10e0e;
             --card-back: #071b4d;
-            --text-color: #f8fafc;
-            --accent: #b10e0e;
+            --text-color: #b10e0e;
+            --accent: #22c55e;
         }
         /* Green rim around the page */
         body::before {
@@ -81,6 +81,7 @@
         }
         .btn:hover { opacity: 0.9; }
         .btn-secondary { background-color: #475569; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         input {
             padding: 12px;
@@ -137,6 +138,12 @@
             border-radius: 8px;
             margin: 10px 0;
         }
+        .button-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
     </style>
 </head>
 <body>
@@ -171,7 +178,7 @@
 
         <div class="table-area">
             <div id="draw-pile" class="pile" onclick="drawCard('deck')">Draw Pile</div>
-            <div id="discard-pile" class="pile" onclick="drawCard('discard')">Discard Pile</div>
+            <div id="discard-pile" class="pile">Discard Pile</div>
             <div id="drawn-card-container"></div>
         </div>
 
@@ -180,7 +187,10 @@
             <div class="grid-container" id="my-grid"></div>
         </div>
 
-        <button id="cambio-btn" class="btn" style="background-color: #dc2626;" onclick="callCambio()">Call Cambio!</button>
+        <div class="button-row">
+            <button id="cambio-btn" class="btn" style="background-color: #dc2626;" onclick="callCambio()">Call Cambio!</button>
+            <button id="end-turn-btn" class="btn btn-secondary" style="display:none;" onclick="endTurnManual()">End Turn</button>
+        </div>
         <div id="action-instruction" style="color: #eab308; font-weight: bold; min-height: 24px;"></div>
         <div id="log"></div>
     </div>
@@ -350,7 +360,7 @@
             });
 
             gameState.deck = deck;
-            gameState.discardPile = [deck.pop()];
+            gameState.discardPile = [];
             gameState.phase = 'playing';
 
             let roomData = { players: gameState.players, deck: gameState.deck, discardPile: gameState.discardPile, phase: 'playing', turnIndex: 0 };
@@ -404,12 +414,23 @@
                 if(topC.suit === '♥' || topC.suit === '♦') cardClass += ' red';
                 discPileEl.className = cardClass;
                 discPileEl.innerHTML = `<span>${topC.rank}${topC.suit}</span><span>Discard</span>`;
+            } else {
+                discPileEl.className = 'pile';
+                discPileEl.innerHTML = 'Discard Pile';
             }
 
             // Turn Indicator
             let currentTurnPlayer = gameState.players[gameState.turnIndex];
             let isMyTurn = currentTurnPlayer && currentTurnPlayer.id === gameState.myId;
             document.getElementById('turn-indicator').innerText = isMyTurn ? "Your Turn! Draw a card." : `${currentTurnPlayer ? currentTurnPlayer.name : 'Someone'}'s turn...`;
+
+            // Show end turn button during power actions or swap phase
+            const endTurnBtn = document.getElementById('end-turn-btn');
+            if(gameState.pendingAction && (gameState.actionClicksLeft === -99 || gameState.actionClicksLeft === 0)) {
+                endTurnBtn.style.display = 'inline-block';
+            } else {
+                endTurnBtn.style.display = 'none';
+            }
         }
 
         function drawCard(source) {
@@ -429,9 +450,6 @@
                     gameState.deck.sort(() => Math.random() - 0.5);
                 }
                 gameState.drawnCard = gameState.deck.pop();
-            } else if(source === 'discard') {
-                if(gameState.discardPile.length === 0) return;
-                gameState.drawnCard = gameState.discardPile.pop();
             }
 
             // Show drawn card to player
@@ -497,9 +515,10 @@
                 document.getElementById('action-instruction').innerText = `Power Activated! Click ${info.looks} card(s) to view.`;
             } else if(info.swap && info.looks === 0) {
                 // Jack (1 swap, 0 looks)
-                document.getElementById('action-instruction').innerText = `Jack: Select TWO cards anywhere on the table to blind swap them.`;
+                document.getElementById('action-instruction').innerText = `Jack: Select TWO cards from opponents to blind swap them.`;
                 gameState.actionClicksLeft = 2; 
             }
+            renderGame();
         }
 
         function handlePowerActionClick(playerId, cardIndex) {
@@ -517,7 +536,7 @@
                 gameState.actionClicksLeft--;
                 if(gameState.actionClicksLeft === 0) {
                     if(gameState.pendingAction.swap) {
-                        document.getElementById('action-instruction').innerText = `Looks complete! Now select TWO cards to swap (or click End Turn to skip swapping).`;
+                        document.getElementById('action-instruction').innerText = `Looks complete! Now select TWO cards from opponents to swap (or click End Turn to skip swapping).`;
                         gameState.actionClicksLeft = -99; // ready for swap selection
                     } else {
                         // Power action finished (e.g. 10)
@@ -525,8 +544,14 @@
                         setTimeout(() => { finishPowerAction(); }, 1500);
                     }
                 }
+                renderGame();
             } else if(gameState.actionClicksLeft === -99) {
-                // Selecting cards for swap
+                // Selecting cards for swap - prevent selecting own cards
+                if(playerId === gameState.myId) {
+                    alert("You cannot swap your own cards!");
+                    return;
+                }
+                
                 if(gameState.selectedCardsForAction.includes(key)) return;
                 gameState.selectedCardsForAction.push(key);
                 renderGame();
@@ -556,6 +581,10 @@
             gameState.selectedCardsForAction = [];
             document.getElementById('action-instruction').innerText = '';
             endTurn();
+        }
+
+        function endTurnManual() {
+            finishPowerAction();
         }
 
         function endTurn() {
